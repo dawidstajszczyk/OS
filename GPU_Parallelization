@@ -1,0 +1,67 @@
+#include <iostream>
+#include <vector>
+#include <numeric>
+#include <chrono>
+#include <cuda_runtime.h>
+#include "device_launch_parameters.h"
+
+
+// CUDA kernel do obliczania iloczynu skalarnego na GPU
+__global__ void dotProductGPU(const float* a, const float* b, float* result, std::size_t size) {
+    // threadIdx.x - indeks wątku w bloku
+    // blockIdx.x - indeks bloku
+    // blockDim.x - rozmiar bloku (blockSize)
+    // gridDim.x - ilość bloków (numBlocks)
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+    for (; tid < size; tid += blockDim.x * gridDim.x) {
+        atomicAdd(result, a[tid] * b[tid]);
+    }
+}
+
+int main() {
+    // Inicjalizacja wektorów
+    const std::size_t size = 1000000;
+    std::vector<float> vectorA(size, 1.0f);
+    std::vector<float> vectorB(size, 2.0f);
+
+    float* deviceVectorA, * deviceVectorB, * deviceResult;
+    float result = 0.0f;
+
+    // Alokacja pamięci na GPU
+    cudaMalloc(&deviceVectorA, size * sizeof(float));
+    cudaMalloc(&deviceVectorB, size * sizeof(float));
+    cudaMalloc(&deviceResult, sizeof(float));
+
+    // Kopiowanie danych z CPU na GPU
+    cudaMemcpy(deviceVectorA, vectorA.data(), size * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(deviceVectorB, vectorB.data(), size * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemset(deviceResult, 0, sizeof(float)); // Inicjalizuj deviceResult na 0
+
+    // Konfiguracja bloków i wątków dla kernela CUDA
+    int blockSize = 256; // Liczba wątków w bloku
+    int numBlocks = (size + blockSize - 1) / blockSize; // Liczba bloków
+    
+    // Rozpocznij odliczanie czasu
+    auto start = std::chrono::high_resolution_clock::now();
+
+    // Wywołanie kernela CUDA
+    dotProductGPU <<<numBlocks, blockSize>>> (deviceVectorA, deviceVectorB, deviceResult, size);
+
+
+    // Kopiowanie wyniku z GPU na CPU
+    cudaMemcpy(&result, deviceResult, sizeof(float), cudaMemcpyDeviceToHost);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = end - start;
+
+    // Zwolnij zaalokowaną pamięć na GPU
+    cudaFree(deviceVectorA);
+    cudaFree(deviceVectorB);
+    cudaFree(deviceResult);
+
+    std::cout << "Dot Product (GPU): " << result << std::endl;
+    std::cout << "Time: " << duration.count() << " seconds" << std::endl;
+
+    return 0;
+}
