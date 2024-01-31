@@ -1,0 +1,58 @@
+#include <chrono>
+#include <emmintrin.h> // SSE intrinsics
+#include <iostream>
+#include <numeric>
+#include <vector>
+
+// Funkcja obliczająca iloczyn skalarny z wykorzystaniem SSE
+float dotProductSIMD(const std::vector<float> &a, const std::vector<float> &b) {
+  int size = a.size();
+  // Jeśli ilość elementów wektorów nie jest podzielna przez 4, końcówka będzie
+  // musiała zostać obsłużona osobno
+  int remainder = size % 4;
+  // Inincjalizuj zmienną sum z początkową wartością zero.
+  __m128 sum = _mm_setzero_ps();
+
+  // Oblicz iloczyn skalarny dla każdego podzbioru 4 elementów wektorów
+  for (int i = 0; i < size - remainder; i += 4) {
+    __m128 va = _mm_loadu_ps(&a[i]);
+    __m128 vb = _mm_loadu_ps(&b[i]);
+    sum = _mm_add_ps(sum, _mm_mul_ps(va, vb));
+  }
+
+  // Dodaj elementy wektora SIMD
+  float result[4];
+  _mm_storeu_ps(result, sum); // kopiowanie z sum do result
+  float dotProduct = std::accumulate(result, result + 4, 0.0f);
+
+  // Jeśli ostatnie elementy nie były wzięte wcześniej pod uwagę, zajmij się
+  // tym.
+  for (int i = size - remainder; i < size; ++i) {
+    dotProduct += a[i] * b[i];
+  }
+
+  return dotProduct;
+}
+
+int main() {
+  // Inicjalizuj wektory
+  const int size = 1000000;
+  std::vector<float> vectorA(size, 1.0);
+  std::vector<float> vectorB(size, 2.0);
+
+  // Rozpocznij pomiar czasu wykonania
+  auto start = std::chrono::high_resolution_clock::now();
+
+  // Oblicz iloczyn skalarny z wykorzystaniem SSE
+  float result = dotProductSIMD(vectorA, vectorB);
+
+  // Zakończ pomiar czasu wykonania
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> duration = end - start;
+
+  // Wyświetl wynik i czas wykonania
+  std::cout << "Dot Product (SIMD): " << result << std::endl;
+  std::cout << "Time: " << duration.count() << " seconds" << std::endl;
+
+  return 0;
+}
