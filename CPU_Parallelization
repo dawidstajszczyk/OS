@@ -1,0 +1,70 @@
+#include <iostream>
+#include <vector>
+#include <numeric>
+#include <thread>
+#include <mutex>
+
+// Funkcja pomocnicza do liczenia iloczynu skalarnego w jednym wątku
+void dotProductThread(const std::vector<float>& a, const std::vector<float>& b, int start, int end, float& result, std::mutex& mtx) {
+    float partialResult = 0.0f;
+    for (int i = start; i < end; ++i) {
+        partialResult += a[i] * b[i];
+    }
+
+    // Zabezpiecz dostęp do zmiennej result za pomocą mutexa
+    {
+    std::lock_guard<std::mutex> lock(mtx);
+    result += partialResult;
+    }
+    // Mutex zostanie automatycznie odblokowany po opuszczeniu zakresu {}
+}
+
+// Funkcja do liczenia iloczynu skalarnego z wielowątkowością
+float dotProductMultithread(const std::vector<float>& a, const std::vector<float>& b) {
+    int numThreads = 2;
+    int size = a.size();
+    int chunkSize = size / numThreads;
+
+    std::vector<std::thread> threads;
+    float result = 0.0f;
+
+    // Mutex do synchronizacji dostępu do zmiennej result
+    std::mutex resultMutex;
+
+    // Rozpoczęcie wątków
+    for (int i = 0; i < numThreads; ++i) {
+        int start = i * chunkSize;
+        int end = (i == numThreads - 1) ? size : (i + 1) * chunkSize;
+        // Dodanie kolejnego wątku do wektora 'threads'
+        threads.emplace_back(dotProductThread, std::ref(a), std::ref(b), start, end, std::ref(result), std::ref(resultMutex));
+    }
+
+    // Oczekiwanie na zakończenie wątków
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    return result;
+}
+
+int main() {
+    // Inicjalizacja wektorów
+    const int size = 1000000;
+    std::vector<float> vectorA(size, 1.0);
+    std::vector<float> vectorB(size, 2.0);
+
+    // Pomiar czasu wykonania
+    auto start = std::chrono::high_resolution_clock::now();
+
+    // Wywołanie funkcji z wielowątkowością
+    float result = dotProductMultithread(vectorA, vectorB);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = end - start;
+
+    // Wyświetlenie wyniku i czasu wykonania
+    std::cout << "Dot Product (Multithread): " << result << std::endl;
+    std::cout << "Time: " << duration.count() << " seconds" << std::endl;
+
+    return 0;
+}
