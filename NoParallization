@@ -1,0 +1,38 @@
+#include <iostream>
+#include <vector>
+#include <numeric>
+#include <chrono>
+
+
+float dotProduct(const std::vector<float>& a, const std::vector<float>& b) {
+    int size = a.size();
+    float result = 0.0f;
+
+    for (int i = 0; i < size; ++i) {
+        result += a[i] * b[i];
+    }
+
+    return result;
+}
+
+int main() {
+    // Inicjalizacja wektorów
+    const int size = 1000000;
+    std::vector<float> vectorA(size, 1.0); // Wektor {1, 1, 1 ...}
+    std::vector<float> vectorB(size, 2.0); // Wektor {2, 2, 2 ...}
+  
+    // Rozpocznij odliczanie czasu
+    auto start = std::chrono::high_resolution_clock::now();
+
+    // Oblicz iloczyn skalarny wektorów 
+    float result = dotProduct(vectorA, vectorB);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = end - start;
+
+    // Wyświetl rezulat
+    std::cout << "Dot Product (Standard): " << result << std::endl;
+    std::cout << "Time: " << duration.count() << " seconds" << std::endl;
+
+    return 0;
+}
